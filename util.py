@@ -21,6 +21,20 @@ def get_phonetic_info(recognition_text_file):
     return phonetic_notations
 
 
+def get_required_files(path, files_to_find):
+    file_list = os.listdir(path)
+    required_files = []
+    for i in files_to_find:
+        for j in i:
+            if j in file_list:
+                required_files.append(f'{path}/{j}')
+                break
+    return required_files
+
+
+
+
+
 def rename(check_list, page_number, page_image_file, word_images_directory, phonetic_notations):
     images_files = [{'index': int(f.split('.')[0]), 'filename': f} for f in os.listdir(word_images_directory)]
     images_files.sort(key=lambda x: x['index'])

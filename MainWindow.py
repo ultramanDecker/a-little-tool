@@ -93,23 +93,24 @@ class MainWidget(QWidget):
 
     def is_directory_valid(self, path: str):
         if not path.isascii():
-            return False, f'{path},  路径不要包含非ascii(中文)字符'
+            return False, f'{path},  路径不要包含非ascii(中文)字符', []
         page_number = path.split('/')[-1]
         if not page_number.isdigit():
-            return False, f'请选择一个代表页号的纯数字目录'
-        file_names = os.listdir(path)
-
-        required_files = [f'Image_{page_number}.jpg', f'Image_{page_number}']
-        for required_file in required_files:
-            if required_file not in file_names:
-                return False, f'缺少目录或文件: {required_file}'
-        if f'Image_{page_number}_clustered.txt' not in file_names and f'Image_{page_number}.txt' not in file_names:
-            return False, f'缺少文件: Image_{page_number}_clustered.txt 或 Image_{page_number}.txt'
+            return False, f'请选择一个代表页号的纯数字目录', []
+        file_to_find = [[f'Image_{page_number}.jpg'],
+                        [f'Image_{page_number}'],
+                        [f'Image_{page_number}_clustered.txt', f'Image_{page_number}.txt']]
+        required_files = util.get_required_files(path, file_to_find)
+        if len(required_files) < len(file_to_find):
+            msg = '缺少下列必要文件或目录之一\n'
+            for i in file_to_find:
+                msg += '或'.join(i) + '\n'
+            return False, msg, []
         files_index = [f.split('.')[0] for f in os.listdir(f'{path}/Image_{page_number}')]
         for index in files_index:
             if not index.isdigit():
                 return False, f'{path}/Image_{page_number} 下包含了不是纯数字.png的图片'
-        return True, ''
+        return True, '', required_files
 
     def show_dialog(self, error_msg):
         dlg = QDialog()
@@ -130,15 +131,16 @@ class MainWidget(QWidget):
         selected_path = QFileDialog.getExistingDirectory(self)
         if selected_path == '':
             return
-        is_valid, error_msg = self.is_directory_valid(selected_path)
+        is_valid, error_msg, required_files = self.is_directory_valid(selected_path)
         if not is_valid:
             self.show_dialog(error_msg)
             return
+        self.file_button.setDisabled(True)
         self.workplace_path = selected_path
         self.page_number = selected_path.split('/')[-1]
-        self.recognition_text_file = f'{self.workplace_path}/Image_{self.page_number}_clustered.txt' if f'{self.workplace_path}/Image_{self.page_number}_clustered.txt' in os.listdir(selected_path) else f'{self.workplace_path}/Image_{self.page_number}.txt'
-        self.page_image_file = f'{self.workplace_path}/Image_{self.page_number}.jpg'
-        self.word_images_directory = f'{self.workplace_path}/Image_{self.page_number}'
+        self.page_image_file = required_files[0]
+        self.word_images_directory = required_files[1]
+        self.recognition_text_file = required_files[2]
         self.notations = get_phonetic_info(self.recognition_text_file)
         files = os.listdir(f'{self.workplace_path}/Image_{self.page_number}')
         files.sort(key=lambda x: int(x.split('.')[0]))
