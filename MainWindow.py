@@ -99,14 +99,16 @@ class MainWidget(QWidget):
             return False, f'请选择一个代表页号的纯数字目录'
         file_names = os.listdir(path)
 
-        required_files = [f'Image_{page_number}.jpg', f'Image_{page_number}_clustered.txt', f'Image_{page_number}']
+        required_files = [f'Image_{page_number}.jpg', f'Image_{page_number}']
         for required_file in required_files:
             if required_file not in file_names:
                 return False, f'缺少目录或文件: {required_file}'
+        if f'Image_{page_number}_clustered.txt' not in file_names and f'Image_{page_number}.txt' not in file_names:
+            return False, f'缺少文件: Image_{page_number}_clustered.txt 或 Image_{page_number}.txt'
         files_index = [f.split('.')[0] for f in os.listdir(f'{path}/Image_{page_number}')]
         for index in files_index:
             if not index.isdigit():
-                return False,f'{path}/Image_{page_number} 下包含了不是纯数字.png的图片'
+                return False, f'{path}/Image_{page_number} 下包含了不是纯数字.png的图片'
         return True, ''
 
     def show_dialog(self, error_msg):
@@ -134,7 +136,7 @@ class MainWidget(QWidget):
             return
         self.workplace_path = selected_path
         self.page_number = selected_path.split('/')[-1]
-        self.recognition_text_file = f'{self.workplace_path}/Image_{self.page_number}_clustered.txt'
+        self.recognition_text_file = f'{self.workplace_path}/Image_{self.page_number}_clustered.txt' if f'{self.workplace_path}/Image_{self.page_number}_clustered.txt' in os.listdir(selected_path) else f'{self.workplace_path}/Image_{self.page_number}_clustered.txt'
         self.page_image_file = f'{self.workplace_path}/Image_{self.page_number}.jpg'
         self.word_images_directory = f'{self.workplace_path}/Image_{self.page_number}'
         self.notations = get_phonetic_info(self.recognition_text_file)
