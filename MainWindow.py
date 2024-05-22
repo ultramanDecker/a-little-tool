@@ -136,7 +136,7 @@ class MainWidget(QWidget):
             return
         self.workplace_path = selected_path
         self.page_number = selected_path.split('/')[-1]
-        self.recognition_text_file = f'{self.workplace_path}/Image_{self.page_number}_clustered.txt' if f'{self.workplace_path}/Image_{self.page_number}_clustered.txt' in os.listdir(selected_path) else f'{self.workplace_path}/Image_{self.page_number}_clustered.txt'
+        self.recognition_text_file = f'{self.workplace_path}/Image_{self.page_number}_clustered.txt' if f'{self.workplace_path}/Image_{self.page_number}_clustered.txt' in os.listdir(selected_path) else f'{self.workplace_path}/Image_{self.page_number}.txt'
         self.page_image_file = f'{self.workplace_path}/Image_{self.page_number}.jpg'
         self.word_images_directory = f'{self.workplace_path}/Image_{self.page_number}'
         self.notations = get_phonetic_info(self.recognition_text_file)
