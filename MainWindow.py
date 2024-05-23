@@ -109,7 +109,7 @@ class MainWidget(QWidget):
         files_index = [f.split('.')[0] for f in os.listdir(f'{path}/Image_{page_number}')]
         for index in files_index:
             if not index.isdigit():
-                return False, f'{path}/Image_{page_number} 下包含了不是纯数字.png的图片'
+                return False, f'{path}/Image_{page_number} 下包含了不是纯数字.png的图片',[]
         return True, '', required_files
 
     def show_dialog(self, error_msg):

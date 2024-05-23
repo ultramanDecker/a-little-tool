@@ -1,4 +1,5 @@
 import os
+import re
 
 import cv2
 from queue import PriorityQueue
@@ -32,9 +33,6 @@ def get_required_files(path, files_to_find):
     return required_files
 
 
-
-
-
 def rename(check_list, page_number, page_image_file, word_images_directory, phonetic_notations):
     images_files = [{'index': int(f.split('.')[0]), 'filename': f} for f in os.listdir(word_images_directory)]
     images_files.sort(key=lambda x: x['index'])
@@ -52,7 +50,7 @@ def rename(check_list, page_number, page_image_file, word_images_directory, phon
         col = position_list[i][0]
         row = position_list[i][1]
         os.rename(f'{word_images_directory}/{images_files[i]["filename"]}',
-                  f'{word_images_directory}/{int(not check_list[i])}_{page_number}_{row}_{col}_{notation_transcribe(notation)}.png')
+                  f'{word_images_directory}/{int(not check_list[i])}_{page_number}_{col}_{row}_{notation_transcribe(notation)}.png')
 
 
 def notation_transcribe(notation: str):
@@ -111,3 +109,13 @@ def get_position_list(page_image_file, word_images_directory):
         res = get_best_fit_coordinate(page_image, w['image'])
         coords_pq.put((cv2.minMaxLoc(res)[-1][0], cv2.minMaxLoc(res)[-1][1], w['index']))
     return fun()
+
+
+def get_page_numbers(path):
+    page_numbers = []
+    for f in os.listdir(path):
+        matched = re.match('Image_[0-9]+', f)
+        if matched is not None:
+            page_numbers.append(int(matched.group().split('_')[1]))
+    page_numbers = set(page_numbers)
+    return page_numbers
