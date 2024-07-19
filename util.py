@@ -14,9 +14,9 @@ transcribe_dict = {'ū': 'v', 'š': 's', 'ž': 'z'}
 
 
 class Orientation(Enum):
-    NULL = ('', ''),
-    LEFT = ('left', 'l'),
-    RIGHT = ('right', 'r')
+    NULL = '',
+    LEFT = 'l',
+    RIGHT = 'r'
 
 
 def read_word_images(path):
@@ -84,7 +84,7 @@ def rename(check_list, page_number, word_images_directory, phonetic_notations, i
         col = images[index]['position'][0]
         row = images[index]['position'][1]
         os.rename(f'{word_images_directory}/{images_files[index]}',
-                  f'{word_images_directory}/{int(not check_list[index])}_{page_number}{orientation.value[1]}_{col}_{row}_{notation_transcribe(notation)}.png')
+                  f'{word_images_directory}/{int(not check_list[index])}_{page_number}{orientation.value[0]}_{col}_{row}_{notation_transcribe(notation)}.png')
 
 
 def notation_transcribe(notation: str):
