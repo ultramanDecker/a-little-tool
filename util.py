@@ -1,5 +1,6 @@
 import os
 import re
+from enum import Enum
 
 import cv2
 from queue import PriorityQueue
@@ -10,6 +11,12 @@ from html2image import Html2Image
 coords_pq = PriorityQueue()
 words = []
 transcribe_dict = {'ū': 'v', 'š': 's', 'ž': 'z'}
+
+
+class Orientation(Enum):
+    NULL = ('', ''),
+    LEFT = ('left', 'l'),
+    RIGHT = ('right', 'r')
 
 
 def read_word_images(path):
@@ -49,7 +56,15 @@ def get_required_items(path, files_to_find):
     return required_items
 
 
-def rename(check_list, page_number, word_images_directory, phonetic_notations, images: dict):
+def is_orientation_valid(files: list, orientation: Orientation):
+    # is_valid = True
+    # orientation =
+    # for file in files:
+
+    pass
+
+
+def rename(check_list, page_number, word_images_directory, phonetic_notations, images: dict, orientation: Orientation):
     images_files = {}
     for f in os.listdir(word_images_directory):
         images_files[int(f.split('.')[0])] = f
@@ -69,12 +84,13 @@ def rename(check_list, page_number, word_images_directory, phonetic_notations, i
         col = images[index]['position'][0]
         row = images[index]['position'][1]
         os.rename(f'{word_images_directory}/{images_files[index]}',
-                  f'{word_images_directory}/{int(not check_list[index])}_{page_number}_{col}_{row}_{notation_transcribe(notation)}.png')
+                  f'{word_images_directory}/{int(not check_list[index])}_{page_number}{orientation.value[1]}_{col}_{row}_{notation_transcribe(notation)}.png')
 
 
 def notation_transcribe(notation: str):
     for k in transcribe_dict.keys():
         notation = notation.replace(k, transcribe_dict[k])
+    notation = notation.replace('z', 'R')
     return notation
 
 
@@ -151,10 +167,11 @@ def get_page_numbers(path):
     return page_numbers
 
 
-def text2img(notation: str,temp_dir:str):
+def text2img(notation: str, temp_dir: str):
     h2i = Html2Image(output_path=temp_dir)
     manchu_str = convert_manchu(notation)
-    h2i.screenshot(html_str=get_html_str(manchu_str), save_as=f'{notation}.png', size=(max(100, 25 * len(manchu_str)), 100))
+    h2i.screenshot(html_str=get_html_str(manchu_str), save_as=f'{notation}.png',
+                   size=(max(100, 25 * len(manchu_str)), 100))
 
 
 def get_html_str(word: str):
@@ -274,5 +291,6 @@ def convert_manchu(s):
 # def finished_handler():
 #
 # # def fetch_image(notation):
+# #
 # #
 # #

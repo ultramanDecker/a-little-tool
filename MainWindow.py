@@ -12,8 +12,10 @@ from lxml import etree
 
 import util
 from ControlBar import ControlBar
+from FetchWorker import FetchWorker
 from ImageComparePanel import ImageComparePanel
-from ImageWorker import ImageWorker
+from ProcessBar import ProcessBar
+from TextRenderWorker import TextRenderWorker
 from MatchWorker import MatchWorker
 
 
@@ -26,26 +28,25 @@ class MainWidget(QWidget):
     position_dict = {}
     counter = 0
     match_worker = None
-    image_worker = None
-
-    sgn_data_arrived = Signal()
+    render_worker = None
+    fetch_worker = None
+    orientation = util.Orientation.NULL
 
     def __init__(self):
         super().__init__()
 
-        self.network_manager = QNetworkAccessManager()
-        self.network_manager.finished.connect(self.on_request_finished)
         self.notations = {}
         self.file_button = QtWidgets.QPushButton('选择路径')
         # self.file_button.setStyle(QStyleFactory.create('Fusion'))
         self.file_button.clicked.connect(self.on_file_button_clicked)
         self.layout = QtWidgets.QVBoxLayout(self)
-        self.process_bar = QProgressBar()
+        self.process_bar = ProcessBar(self)
         self.process_bar.setRange(0, 0)
-        # self.process_bar.setStyle(QStyleFactory.create('Fusion'))
-        # self.process_bar.setValue(50)
+        self.combox = QtWidgets.QComboBox()
+        self.combox.addItem('网络获取')
+        self.combox.addItem('本地生成')
 
-        self.sgn_data_arrived.connect(self.on_data_arrived)
+        self.process_bar.sgn_finished.connect(self.on_all_finished)
 
         self.images = {}
         self.dictionary_images = {}
@@ -53,6 +54,7 @@ class MainWidget(QWidget):
         self.temp_dir = ''
         header_layout = QtWidgets.QHBoxLayout()
         header_layout.addWidget(self.process_bar)
+        header_layout.addWidget(self.combox)
         header_layout.addWidget(self.file_button)
 
         center_layout = QtWidgets.QHBoxLayout()
@@ -71,15 +73,7 @@ class MainWidget(QWidget):
         self.layout.setStretch(0, 2)
         self.layout.setStretch(1, 8)
         self.layout.setStretch(2, 2)
-
-    def fetch_image(self, notation):
         self.control_bar.disable()
-        notation = util.notation_transcribe(notation)
-        print(notation)
-        url = QUrl(
-            f'http://anakv.com/msc.php?input={notation}&font=1&wpc=5&fontsize=25&cspace=10&fcolor=Black&bcolor=White')
-        request = QNetworkRequest(url)
-        self.network_manager.get(request)
 
     @Slot()
     def on_data_arrived(self):
@@ -99,54 +93,60 @@ class MainWidget(QWidget):
             self.compare_panel.set_right(QPixmap(), '加载中...')
 
     @Slot()
-    def on_request_finished(self, reply):
-        content = reply.readAll()
-        content_type = reply.header(QNetworkRequest.KnownHeaders.ContentTypeHeader)
-        if content == b'':
-            pass
-        elif content_type is None or 'html' in content_type:
-            html = etree.HTML(content.toStdString())
-            js_tag = html.xpath('/html/body/script')[0]
-            uri = js_tag.text.split('window.location=')[1]
-            url = 'http://anakv.com' + re.sub('"\s*\+\s*"', '', uri).strip(';').strip('"')
-            request = QNetworkRequest(url)
-            self.network_manager.get(request)
-        else:
-            pmap = QPixmap()
-            pmap.loadFromData(content)
-            notation = reply.request().url().url().split('?')[1].split('&')[0].split('=')[1]
-            self.dictionary_images[notation] = pmap
-            self.counter += 1
-            self.sgn_data_arrived.emit()
-            self.control_bar.enable()
-
-    @Slot()
     def on_confirmed(self, check_list):
-        util.rename(check_list[0], self.page_number, self.word_images_directory, self.notations, self.images)
-        shutil.rmtree(self.temp_dir)
+        util.rename(check_list[0], self.page_number, self.word_images_directory, self.notations, self.images,
+                    self.orientation)
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
         self.show_dialog('完成')
         sys.exit(0)
 
-    def is_directory_valid(self, path: str):
+    def closeEvent(self, event):
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+
+    def check_and_set_context(self, path: str):
         if not path.isascii():
-            return False, f'{path},  路径不要包含非ascii(中文)字符', []
-        page_number = path.split('/')[-1]
-        if not page_number.isdigit():
-            return False, f'请选择一个代表页号的纯数字目录', []
-        files_to_find = [[f'Image_{page_number}.jpg'],
-                         [f'Image_{page_number}'],
-                         [f'Image_{page_number}_clustered.txt', f'Image_{page_number}.txt']]
+            return False, f'{path},  路径不要包含非ascii(中文)字符'
+
+        top_folder = path.split('/')[-1]
+        if not re.match('^[0-9]+(_right|_left)?$', top_folder):
+            return False, f'请选择一个形如"页号_方向(left或者right)"或者"页号"的目录'
+        top_folder_split = top_folder.split('_')
+        page_number = top_folder_split[0]
+        self.page_number = top_folder_split[0]
+        if len(top_folder_split) == 1:
+            self.orientation = util.Orientation.NULL
+        else:
+            if top_folder_split[1] == 'right':
+                self.orientation = util.Orientation.RIGHT
+            elif top_folder_split[1] == 'left':
+                self.orientation = util.Orientation.LEFT
+
+        files_to_find = [
+            [f'Image_{page_number}.jpg', f'Image_{page_number}_right.jpg', f'Image_{page_number}_left.jpg'],
+            [f'Image_{page_number}', f'Image_{page_number}_right', f'Image_{page_number}_left'],
+            [f'Image_{page_number}_clustered.txt', f'Image_{page_number}.txt', f'Image_{page_number}_right.txt',
+             f'Image_{page_number}_left.txt']]
         required_files = util.get_required_items(path, files_to_find)
+
         if len(required_files) < len(files_to_find):
             msg = '缺少下列必要文件或目录之一\n'
             for f in files_to_find:
                 msg += '或'.join(f) + '\n'
-            return False, msg, []
-        files_index = [f.split('.')[0] for f in os.listdir(f'{path}/Image_{page_number}')]
+            return False, msg
+
+        self.page_image_file = required_files[0]
+        self.word_images_directory = required_files[1]
+        self.recognition_text_file = required_files[2]
+
+
+
+        files_index = [f.split('.')[0] for f in os.listdir(self.word_images_directory)]
         for index in files_index:
             if not index.isdigit():
-                return False, f'{path}/Image_{page_number} 下包含了不是纯数字.png的图片', []
-        return True, '', required_files
+                return False, f'{self.word_images_directory} 下包含了不是纯数字.png的图片'
+        return True, ''
 
     def show_dialog(self, error_msg):
         dlg = QDialog()
@@ -164,14 +164,11 @@ class MainWidget(QWidget):
 
     @Slot()
     def on_image_worker_done(self, result):
-        print('image worker done')
         self.dictionary_images = result[0]
-        self.control_bar.enable_confirm_button()
         self.control_bar.sgn_refresh.emit()
 
     @Slot()
     def on_match_worker_done(self, result):
-        print('match done')
         for r in result:
             self.images[r[2]]['position'] = (r[0], r[1])
         self.images = dict(sorted(self.images.items(), key=lambda item: item[1]['position']))
@@ -179,11 +176,13 @@ class MainWidget(QWidget):
         notations = util.read_romanizations(self.recognition_text_file)
         corrected_notations = {}
 
-        for i,k in enumerate(self.images.keys()):
+        for i, k in enumerate(self.images.keys()):
             corrected_notations[k] = util.notation_transcribe(notations[i])
 
         self.notations = corrected_notations
+        self.process_bar.setValue(self.process_bar.value() + 1)
         self.control_bar.set_indexes(indexes)
+        self.control_bar.enable_confirm_button()
         self.control_bar.sgn_refresh.emit()
 
     @Slot()
@@ -191,43 +190,45 @@ class MainWidget(QWidget):
         self.process_bar.setValue(index)
 
     @Slot()
+    def on_all_finished(self):
+        self.control_bar.enable()
+
+    @Slot()
     def on_file_button_clicked(self):
         selected_path = QFileDialog.getExistingDirectory(self)
         if selected_path == '':
             return
-        is_valid, error_msg, required_items = self.is_directory_valid(selected_path)
+        is_valid, error_msg = self.check_and_set_context(selected_path)
         if not is_valid:
             self.show_dialog(error_msg)
             return
         self.file_button.setDisabled(True)
         self.workplace_path = selected_path
-        self.page_number = selected_path.split('/')[-1]
-        self.page_image_file = required_items[0]
-        self.word_images_directory = required_items[1]
-        self.recognition_text_file = required_items[2]
+
         notations = util.read_romanizations(self.recognition_text_file)
         self.images = util.read_word_images(self.word_images_directory)
-        self.process_bar.setRange(0, len(self.images))
+        self.process_bar.setRange(0, len(self.images) + 1)
         self.process_bar.setValue(0)
-        # tmp = util.get_position_list(self.page_image_file, self.word_images_directory)
-        # for t in tmp:
-        #     self.images[t[2]]['position'] = (t[0], t[1])
-        # self.images = dict(sorted(self.images.items(), key=lambda item: item[1]['position']))
         os.makedirs(f'{self.workplace_path}/temp', exist_ok=True)
         self.temp_dir = f'{self.workplace_path}/temp'
-        # self.temp_dir = os.path.join(self.workplace_path, 'temp')
 
         self.notations = notations
         self.match_worker = MatchWorker(self.page_image_file, self.word_images_directory)
         self.match_worker.sgn_match_done.connect(self.on_match_worker_done)
         self.match_worker.start()
-        self.image_worker = ImageWorker(notations, self.temp_dir)
-        self.image_worker.sgn_worker_done.connect(self.on_image_worker_done)
-        self.image_worker.sgn_process_changed.connect(self.on_process_changed)
-        self.image_worker.start()
+        self.render_worker = TextRenderWorker(notations, self.temp_dir)
+        self.render_worker.sgn_worker_done.connect(self.on_image_worker_done)
+        self.render_worker.sgn_process_changed.connect(self.on_process_changed)
+        self.fetch_worker = FetchWorker(self.notations)
+        self.fetch_worker.sgn_worker_done.connect(self.on_image_worker_done)
+        self.fetch_worker.sgn_process_changed.connect(self.on_process_changed)
+        if self.combox.currentIndex() == 0:
+            self.fetch_worker.start()
+        elif self.combox.currentIndex() == 1:
+            self.render_worker.start()
+        self.combox.setDisabled(True)
         indexes = list(self.images.keys())
         self.control_bar.set_indexes(indexes)
-        self.control_bar.enable()
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@ from PySide6.QtGui import QPixmap, QImage, QTransform
 import util
 
 
-class ImageWorker(QThread):
+class TextRenderWorker(QThread):
     notations = []
     dictionary_images = {}
     temp_dir = ''
@@ -12,7 +12,7 @@ class ImageWorker(QThread):
     sgn_process_changed = Signal(int)
 
     def __init__(self, notations, temp_dir, parent=None):
-        super(ImageWorker, self).__init__(parent)
+        super(TextRenderWorker, self).__init__(parent)
         self.notations = notations
         self.temp_dir = temp_dir
 
