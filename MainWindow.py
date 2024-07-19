@@ -206,6 +206,7 @@ class MainWidget(QWidget):
         self.file_button.setDisabled(True)
         self.workplace_path = selected_path
 
+
         notations = util.read_romanizations(self.recognition_text_file)
         self.images = util.read_word_images(self.word_images_directory)
         self.process_bar.setRange(0, len(self.images) + 1)
