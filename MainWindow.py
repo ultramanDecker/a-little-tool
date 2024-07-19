@@ -233,6 +233,7 @@ class MainWidget(QWidget):
         self.control_bar.set_indexes(indexes)
 
 
+
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     window = MainWidget()
