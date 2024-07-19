@@ -187,7 +187,8 @@ class MainWidget(QWidget):
 
     @Slot()
     def on_process_changed(self, index):
-        self.process_bar.setValue(index)
+        self.process_bar.increase()
+
 
     @Slot()
     def on_all_finished(self):
